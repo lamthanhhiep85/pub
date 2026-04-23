@@ -1,0 +1,177 @@
+
+<div style="padding:1rem 0;">
+<h2 class="sr-only">Diện tích đối xứng các cặp alpha, kèm alpha=1</h2>
+
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--color-text-secondary);">
+  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:18px;height:2px;background:#3266ad;"></span>α=1 (tự đối xứng)</span>
+  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:18px;height:2px;background:#1da575;"></span>α=0.5</span>
+  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:18px;height:2px;border-top:2px dashed #1da575;"></span>α=2</span>
+  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:18px;height:2px;background:#c933a8;"></span>α=0.2</span>
+  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:18px;height:2px;border-top:2px dashed #c933a8;"></span>α=5</span>
+  <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:18px;height:2px;border-top:2px dashed #aaa;"></span>y=x</span>
+</div>
+
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+  <label style="font-size:13px;color:var(--color-text-secondary);">a =</label>
+  <input type="range" id="aSlider" min="10" max="80" value="30" step="1" style="flex:1;max-width:240px;">
+  <span style="font-size:12px;color:var(--color-text-secondary);">a=<strong id="aVal">0.30</strong>  1/a=<strong id="bVal">3.33</strong></span>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;font-size:12px;">
+  <div style="background:var(--color-background-secondary);border-radius:8px;padding:8px 12px;">
+    <div style="color:var(--color-text-secondary);font-size:11px;margin-bottom:2px;">α=0.5 ↔ 2</div>
+    <div>S<sub>L</sub>=<strong id="sl05"></strong> &nbsp; S<sub>R</sub>=<strong id="sr05"></strong></div>
+  </div>
+  <div style="background:var(--color-background-secondary);border-radius:8px;padding:8px 12px;">
+    <div style="color:var(--color-text-secondary);font-size:11px;margin-bottom:2px;">α=0.2 ↔ 5</div>
+    <div>S<sub>L</sub>=<strong id="sl02"></strong> &nbsp; S<sub>R</sub>=<strong id="sr02"></strong></div>
+  </div>
+</div>
+
+<div style="position:relative;width:100%;max-width:500px;margin:0 auto;">
+  <canvas id="cv" role="img" aria-label="Diện tích đối xứng các cặp alpha qua y=x"></canvas>
+</div>
+</div>
+
+<script>
+(function(){
+  const SIZE = 500;
+  const cv = document.getElementById('cv');
+  cv.width = SIZE; cv.height = SIZE;
+  cv.style.width = '100%'; cv.style.height = 'auto';
+  const ctx = cv.getContext('2d');
+  const XMAX = 5;
+
+  function toC(x, y) {
+    const pad = 50;
+    const W = SIZE - pad*2 + pad;
+    return [
+      pad + (x / XMAX) * (SIZE - pad*1.5),
+      SIZE - pad - (y / XMAX) * (SIZE - pad*1.5)
+    ];
+  }
+
+  const fp = a => x => Math.pow(x, -a);
+  const f1 = fp(1), f05 = fp(0.5), f2 = fp(2), f02 = fp(0.2), f5 = fp(5);
+
+  function numInt(fn1, fn2, x0, x1, n=500) {
+    let s = 0; const dx = (x1-x0)/n;
+    for (let i=0; i<n; i++) {
+      const x = x0 + (i+0.5)*dx;
+      s += Math.abs(fn1(x)-fn2(x))*dx;
+    }
+    return s;
+  }
+
+  function fillBetween(fnA, fnB, x0, x1, color) {
+    const N=400;
+    ctx.beginPath();
+    for (let i=0;i<=N;i++) {
+      const x = x0+(x1-x0)*i/N;
+      const y = Math.min(Math.max(fnA(x),0), XMAX);
+      const [cx,cy] = toC(x,y);
+      i===0 ? ctx.moveTo(cx,cy) : ctx.lineTo(cx,cy);
+    }
+    for (let i=N;i>=0;i--) {
+      const x = x0+(x1-x0)*i/N;
+      const y = Math.min(Math.max(fnB(x),0), XMAX);
+      const [cx,cy] = toC(x,y);
+      ctx.lineTo(cx,cy);
+    }
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  function drawCurve(fn, color, dash=[]) {
+    ctx.strokeStyle = color; ctx.lineWidth = 2;
+    ctx.setLineDash(dash); ctx.beginPath();
+    let first=true;
+    for (let i=1;i<=800;i++) {
+      const x = 0.04 + (XMAX-0.04)*i/800;
+      const y = fn(x);
+      if (y>XMAX*1.05||y<0) {first=true;continue;}
+      const [cx,cy] = toC(x,y);
+      first ? ctx.moveTo(cx,cy) : ctx.lineTo(cx,cy);
+      first=false;
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  function draw(a) {
+    const b = 1/a;
+    ctx.clearRect(0,0,SIZE,SIZE);
+    const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+    const axCol = isDark ? '#666' : '#bbb';
+    const txtCol = isDark ? '#bbb' : '#666';
+
+    ctx.strokeStyle = axCol; ctx.lineWidth = 0.5;
+    const [ox,oy] = toC(0,0);
+    const [ex] = toC(XMAX,0);
+    const [,ey] = toC(0,XMAX);
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ex,oy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ox,ey); ctx.stroke();
+
+    ctx.fillStyle = txtCol; ctx.font='11px sans-serif';
+    for (let v=1;v<=4;v++) {
+      const [tx,ty] = toC(v,0);
+      const [,gy] = toC(0,v);
+      ctx.fillText(v, tx-4, oy+14);
+      ctx.fillText(v, ox-18, gy+4);
+      ctx.strokeStyle = isDark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.06)';
+      ctx.lineWidth=0.5; ctx.beginPath();
+      ctx.moveTo(tx,oy); ctx.lineTo(tx,ey);
+      ctx.moveTo(ox,gy); ctx.lineTo(ex,gy);
+      ctx.stroke();
+    }
+
+    ctx.setLineDash([6,4]); ctx.strokeStyle='#aaa'; ctx.lineWidth=1;
+    ctx.beginPath(); const [d0x,d0y]=toC(0,0); const [d1x,d1y]=toC(XMAX,XMAX);
+    ctx.moveTo(d0x,d0y); ctx.lineTo(d1x,d1y); ctx.stroke(); ctx.setLineDash([]);
+
+    fillBetween(f05, f2,  a, 1,   'rgba(29,165,117,0.20)');
+    fillBetween(f2,  f05, 1, Math.min(b,XMAX), 'rgba(29,165,117,0.20)');
+    fillBetween(f02, f5,  a, 1,   'rgba(201,51,168,0.15)');
+    fillBetween(f5,  f02, 1, Math.min(b,XMAX), 'rgba(201,51,168,0.15)');
+
+    drawCurve(f1,  '#3266ad');
+    drawCurve(f05, '#1da575');
+    drawCurve(f2,  '#1da575', [5,3]);
+    drawCurve(f02, '#c933a8');
+    drawCurve(f5,  '#c933a8', [5,3]);
+
+    ctx.strokeStyle = isDark?'rgba(255,255,255,0.4)':'rgba(0,0,0,0.3)';
+    ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    const [ax] = toC(a,0); const [bxc] = toC(Math.min(b,XMAX),0);
+    const [,aytop] = toC(a, Math.min(f02(a),XMAX));
+    const [,bybot] = toC(Math.min(b,XMAX), Math.min(f5(Math.min(b,XMAX)),XMAX));
+    ctx.beginPath(); ctx.moveTo(ax,oy); ctx.lineTo(ax,aytop); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bxc,oy); ctx.lineTo(bxc,bybot); ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle=txtCol; ctx.font='12px sans-serif';
+    ctx.fillText('a', ax-4, oy+14);
+    if (b <= XMAX) ctx.fillText('1/a', bxc-10, oy+14);
+    ctx.fillText('1', toC(1,0)[0]-4, oy+14);
+
+    const sl05 = numInt(f05,f2,a,1);
+    const sr05 = numInt(f2,f05,1,Math.min(b,XMAX));
+    const sl02 = numInt(f02,f5,a,1);
+    const sr02 = numInt(f5,f02,1,Math.min(b,XMAX));
+    document.getElementById('sl05').textContent = sl05.toFixed(4);
+    document.getElementById('sr05').textContent = sr05.toFixed(4);
+    document.getElementById('sl02').textContent = sl02.toFixed(4);
+    document.getElementById('sr02').textContent = sr02.toFixed(4);
+  }
+
+  const slider = document.getElementById('aSlider');
+  function update() {
+    const a = slider.value/100;
+    document.getElementById('aVal').textContent = a.toFixed(2);
+    document.getElementById('bVal').textContent = (1/a).toFixed(2);
+    draw(a);
+  }
+  slider.addEventListener('input', update);
+  update();
+})();
+</script>
