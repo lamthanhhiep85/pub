@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tôpô Học — Interactive</title>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0f1117; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+
+/* SIDEBAR */
+#sidebar {
+  width: 200px; min-width: 200px; background: #1a1d2e; border-right: 1px solid #2d3748;
+  display: flex; flex-direction: column; padding: 16px 0;
+}
+#sidebar h2 { font-size: 13px; color: #718096; text-transform: uppercase; letter-spacing: 1px; padding: 0 16px 12px; border-bottom: 1px solid #2d3748; margin-bottom: 8px; }
+.nav-item {
+  padding: 10px 16px; cursor: pointer; font-size: 13px; color: #a0aec0;
+  border-left: 3px solid transparent; transition: all 0.2s;
+}
+.nav-item:hover { background: #2d3748; color: #e2e8f0; }
+.nav-item.active { background: #2a2d4a; color: #81e6d9; border-left-color: #81e6d9; }
+.nav-item .en { font-size: 10px; color: #4a5568; display: block; margin-top: 2px; }
+
+/* MAIN */
+#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#topbar { background: #1a1d2e; padding: 12px 24px; border-bottom: 1px solid #2d3748; }
+#topbar h1 { font-size: 16px; color: #81e6d9; }
+#topbar p { font-size: 12px; color: #718096; margin-top: 2px; }
+
+#content { flex: 1; display: flex; overflow: hidden; }
+#canvas-area { flex: 1; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; overflow-y: auto; }
+#formula-area { width: 280px; min-width: 280px; background: #13151f; border-left: 1px solid #2d3748; padding: 20px; overflow-y: auto; font-size: 13px; }
+
+canvas { border-radius: 8px; border: 1px solid #2d3748; cursor: crosshair; max-width: 100%; }
+.ctrl-row { margin: 8px 0; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.btn {
+  background: #2d3748; color: #e2e8f0; border: 1px solid #4a5568;
+  border-radius: 6px; padding: 5px 12px; cursor: pointer; font-size: 12px; transition: all 0.15s;
+}
+.btn:hover { background: #3d4a5c; }
+.btn.active { background: #2c7a7b; border-color: #81e6d9; color: #81e6d9; }
+.hint { font-size: 11px; color: #718096; margin-top: 6px; text-align: center; }
+
+/* FORMULA PANEL */
+#formula-area h3 { font-size: 13px; color: #81e6d9; margin-bottom: 12px; border-bottom: 1px solid #2d3748; padding-bottom: 8px; }
+.fblock { margin-bottom: 16px; }
+.fblock .flabel { font-size: 11px; color: #718096; text-transform: uppercase; margin-bottom: 6px; }
+.fblock .ftext { font-size: 12px; color: #cbd5e0; line-height: 1.6; }
+.fblock .fvi { font-size: 12px; color: #a0aec0; font-style: italic; margin-top: 4px; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h2>Tôpô Học</h2>
+  <div class="nav-item active" onclick="show(0)">1. Tập Mở <span class="en">Open Set</span></div>
+  <div class="nav-item" onclick="show(1)">2. Bao Đóng <span class="en">Closure</span></div>
+  <div class="nav-item" onclick="show(2)">3. Hausdorff T₂ <span class="en">Separation</span></div>
+  <div class="nav-item" onclick="show(3)">4. Compắc <span class="en">Compact</span></div>
+  <div class="nav-item" onclick="show(4)">5. Liên Thông <span class="en">Connected</span></div>
+  <div class="nav-item" onclick="show(5)">6. Trù Mật <span class="en">Dense</span></div>
+  <div class="nav-item" onclick="show(6)">7. Không Gian Thương <span class="en">Quotient Space</span></div>
+  <div class="nav-item" onclick="show(7)">8. Không Gian Phủ <span class="en">Covering Space</span></div>
+</div>
+
+<div id="main">
+  <div id="topbar">
+    <h1 id="title">Tập Mở — Open Set</h1>
+    <p id="subtitle">Hover vào canvas để khám phá</p>
+  </div>
+  <div id="content">
+    <div id="canvas-area">
+      <div class="ctrl-row" id="ctrl-row"></div>
+      <canvas id="cv" width="480" height="220"></canvas>
+      <div class="hint" id="hint"></div>
+    </div>
+    <div id="formula-area">
+      <h3>Định nghĩa / Definition</h3>
+      <div id="fml"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+
+let current = 0;
+let state = {};
+
+// ── PANELS ──────────────────────────────────────────────
+const panels = [
+
+// 0: TẬP MỞ
+{
+  title: 'Tập Mở — Open Set',
+  subtitle: 'Hover vào khoảng mở để thấy vùng đệm ε',
+  hint: 'Di chuột vào vùng xanh trên trục số',
+  formula: `
+    <div class="fblock">
+      <div class="flabel">Chính quy / Formal</div>
+      <div class="ftext">$$U \\in \\mathcal{T} \\text{ mở} \\iff \\forall x\\in U,\\ \\exists\\varepsilon>0: B(x,\\varepsilon)\\subseteq U$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Hình dung / Intuition</div>
+      <div class="fvi">Mỗi điểm trong tập đều có "vùng đệm" — không có điểm nào nằm sát bờ.</div>
+      <div class="fvi">Every point has a buffer zone around it — no point sits on the boundary.</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Ví dụ / Example</div>
+      <div class="ftext">$$(a,b) \\subset \\mathbb{R}$$ mở<br>$$[a,b] \\subset \\mathbb{R}$$ đóng<br>$$[a,b) $$ không mở, không đóng</div>
+    </div>`,
+  btns: [],
+  init() { state = {}; },
+  draw(mx) {
+    const a=80, b=W-80, y=H/2;
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#0f1117'; ctx.fillRect(0,0,W,H);
+    // axis
+    ctx.strokeStyle='#4a5568'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(W-40,y); ctx.stroke();
+    // open interval highlight
+    ctx.fillStyle='rgba(99,179,237,0.12)'; ctx.fillRect(a,y-28,b-a,56);
+    ctx.strokeStyle='#63b3ed'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(a,y); ctx.lineTo(b,y); ctx.stroke();
+    ctx.font='bold 20px serif'; ctx.fillStyle='#63b3ed';
+    ctx.fillText('(',a-12,y+7); ctx.fillText(')',b+2,y+7);
+    ctx.font='13px sans-serif'; ctx.fillStyle='#718096';
+    ctx.fillText('a',a-4,y+36); ctx.fillText('b',b-4,y+36);
+    ctx.fillText('ℝ',W-36,y+5);
+
+    if(mx && mx>a+6 && mx<b-6) {
+      const dA=mx-a, dB=b-mx, eps=Math.min(dA,dB)*0.7;
+      // epsilon zone
+      ctx.fillStyle='rgba(252,196,25,0.15)'; ctx.fillRect(mx-eps,y-22,eps*2,44);
+      ctx.strokeStyle='#fcc419'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+      ctx.strokeRect(mx-eps,y-22,eps*2,44); ctx.setLineDash([]);
+      // arrows
+      ctx.strokeStyle='#fcc419'; ctx.lineWidth=1.2;
+      ctx.beginPath(); ctx.moveTo(mx,y-26); ctx.lineTo(mx-eps,y-26); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(mx,y-26); ctx.lineTo(mx+eps,y-26); ctx.stroke();
+      ctx.font='12px serif'; ctx.fillStyle='#fcc419';
+      ctx.fillText('ε',mx-eps/2-4,y-30); ctx.fillText('ε',mx+eps/2-4,y-30);
+      // point x
+      ctx.beginPath(); ctx.arc(mx,y,7,0,Math.PI*2);
+      ctx.fillStyle='#f6ad55'; ctx.fill();
+      ctx.font='bold 14px serif'; ctx.fillStyle='#f6ad55';
+      ctx.fillText('x',mx-4,y-14);
+      // status
+      ctx.font='13px monospace'; ctx.fillStyle='#68d391';
+      ctx.fillText('B(x, ε) ⊆ (a,b)  ✓',12,22);
+    } else {
+      ctx.font='12px monospace'; ctx.fillStyle='#4a5568';
+      ctx.fillText('← hover vào vùng xanh',a,22);
+    }
+  }
+},
+
+// 1: BAO ĐÓNG
+{
+  title: 'Tập Đóng & Bao Đóng — Closure',
+  subtitle: 'Chọn loại tập, hover để kiểm tra điểm',
+  hint: 'Click nút để đổi loại tập, hover để kiểm tra điểm',
+  formula: `
+    <div class="fblock">
+      <div class="flabel">Tập Đóng / Closed Set</div>
+      <div class="ftext">$$F \\text{ đóng} \\iff X\\setminus F \\in \\mathcal{T}$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Bao Đóng / Closure</div>
+      <div class="ftext">$$\\overline{A} = \\bigcap\\{F\\supseteq A \\mid F \\text{ đóng}\\}$$$$= A \\cup A'$$</div>
+      <div class="fvi">A' = tập điểm giới hạn của A<br>A' = set of limit points of A</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Quan hệ / Relation</div>
+      <div class="ftext">$$\\partial A = \\overline{A}\\setminus\\mathrm{Int}(A)$$</div>
+      <div class="fvi">Biên = bao đóng trừ phần nội<br>Boundary = closure minus interior</div>
+    </div>`,
+  btns: ['Mở (a,b)', 'Đóng [a,b]', 'Nửa mở [a,b)'],
+  init() { state = {mode:0}; },
+  draw(mx, my) {
+    const ox=80,oy=50,sz=130;
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#0f1117'; ctx.fillRect(0,0,W,H);
+    const m = state.mode||0;
+    const labels=[['(','(',')',')','Mở'],['[','[',']',']','Đóng'],['[','[',')',')','Nửa mở']];
+    const l=labels[m];
+    ctx.fillStyle='rgba(99,179,237,0.12)'; ctx.fillRect(ox,oy,sz,sz);
+    // border style
+    ctx.lineWidth=2.5;
+    if(m===0){ ctx.strokeStyle='#63b3ed'; ctx.setLineDash([6,4]); ctx.strokeRect(ox,oy,sz,sz); ctx.setLineDash([]); }
+    else if(m===1){ ctx.strokeStyle='#68d391'; ctx.strokeRect(ox,oy,sz,sz); }
+    else {
+      ctx.strokeStyle='#68d391'; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ox,oy+sz); ctx.lineTo(ox+sz/2,oy+sz); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ox,oy); ctx.lineTo(ox+sz,oy); ctx.stroke();
+      ctx.strokeStyle='#63b3ed'; ctx.setLineDash([5,4]);
+      ctx.beginPath(); ctx.moveTo(ox+sz/2,oy+sz); ctx.lineTo(ox+sz,oy+sz); ctx.lineTo(ox+sz,oy); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // labels
+    ctx.font='14px serif'; ctx.fillStyle= m===0?'#63b3ed':'#68d391';
+    ctx.fillText(l[4]+' — '+['(a,b)²','[a,b]²','[a,b)²'][m], ox, oy-10);
+
+    // hover
+    if(mx) {
+      const inX = mx>ox && mx<ox+sz, inY = my>oy && my<oy+sz;
+      const onBorder = Math.min(Math.abs(mx-ox),Math.abs(mx-ox-sz),Math.abs(my-oy),Math.abs(my-oy-sz)) < 10;
+      let inside = false;
+      if(m===0) inside = mx>ox+2&&mx<ox+sz-2&&my>oy+2&&my<oy+sz-2;
+      else if(m===1) inside = mx>=ox&&mx<=ox+sz&&my>=oy&&my<=oy+sz;
+      else inside = mx>=ox&&mx<ox+sz&&my>=oy&&my<oy+sz;
+      ctx.beginPath(); ctx.arc(mx,my,6,0,Math.PI*2);
+      ctx.fillStyle= inside?'#68d391':'#fc8181'; ctx.fill();
+      ctx.font='12px monospace'; ctx.fillStyle='#e2e8f0';
+      ctx.fillText(inside?'x ∈ A  ✓':'x ∉ A  ✗', ox+sz+16, oy+30);
+      if(onBorder&&(inX||inY)){
+        ctx.fillStyle='#fcc419'; ctx.font='11px sans-serif';
+        ctx.fillText('← ∂A biên', ox+sz+16, oy+50);
+      }
+    }
+    // legend
+    ctx.font='11px sans-serif';
+    ctx.fillStyle='#68d391'; ctx.fillText('● trong tập',ox,oy+sz+28);
+    ctx.fillStyle='#fc8181'; ctx.fillText('● ngoài tập',ox+80,oy+sz+28);
+    ctx.fillStyle='#fcc419'; ctx.fillText('◆ biên ∂A',ox+165,oy+sz+28);
+  }
+},
+
+// 2: HAUSDORFF
+{
+  title: 'Tiên Đề Hausdorff T₂ — Hausdorff Space',
+  subtitle: 'Hover để di chuyển điểm x, xem vùng tách U, V',
+  hint: 'Di chuột — kéo x ra xa y để tách được',
+  formula: `
+    <div class="fblock">
+      <div class="flabel">Định nghĩa / Definition</div>
+      <div class="ftext">$$X \\text{ là } T_2 \\iff \\forall x\\neq y,\\ \\exists U\\ni x,\\ V\\ni y:\\ U\\cap V=\\emptyset$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Thứ bậc / Hierarchy</div>
+      <div class="ftext">$$T_0 \\subset T_1 \\subset T_2 \\subset T_3 \\subset T_4$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Tính chất / Properties</div>
+      <div class="fvi">• Không gian metric luôn là T₂<br>• Every metric space is Hausdorff<br>• Tập compact trong T₂ là đóng<br>• Compact subsets of T₂ are closed</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Non-Hausdorff</div>
+      <div class="fvi">Đường thẳng đôi: 0ₐ và 0_b không tách được<br>Line with doubled origin: 0ₐ, 0_b inseparable</div>
+    </div>`,
+  btns: ['Hausdorff ✓','Non-Hausdorff ✗'],
+  init() { state={mode:0}; },
+  draw(mx,my) {
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#0f1117'; ctx.fillRect(0,0,W,H);
+    if((state.mode||0)===0) {
+      const qx=320,qy=H/2;
+      const px= mx?Math.min(Math.max(mx,60),260):160, py=my?my:H/2;
+      const dx=px-qx,dy=py-qy,dist=Math.sqrt(dx*dx+dy*dy);
+      const rU=Math.min(dist*0.4,85), rV=Math.min(dist*0.4,85);
+      // U
+      ctx.beginPath(); ctx.arc(px,py,rU,0,Math.PI*2);
+      ctx.fillStyle='rgba(99,179,237,0.15)'; ctx.fill();
+      ctx.strokeStyle='#63b3ed'; ctx.lineWidth=2; ctx.setLineDash([5,3]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.font='bold 14px serif'; ctx.fillStyle='#63b3ed'; ctx.fillText('U',px-rU-18,py+5);
+      // V
+      ctx.beginPath(); ctx.arc(qx,qy,rV,0,Math.PI*2);
+      ctx.fillStyle='rgba(252,196,25,0.12)'; ctx.fill();
+      ctx.strokeStyle='#fcc419'; ctx.lineWidth=2; ctx.setLineDash([5,3]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle='#fcc419'; ctx.fillText('V',qx+rV+5,qy+5);
+      // points
+      ctx.beginPath(); ctx.arc(px,py,7,0,Math.PI*2); ctx.fillStyle='#63b3ed'; ctx.fill();
+      ctx.font='bold 14px serif'; ctx.fillStyle='#63b3ed'; ctx.fillText('x',px+10,py-8);
+      ctx.beginPath(); ctx.arc(qx,qy,7,0,Math.PI*2); ctx.fillStyle='#fcc419'; ctx.fill();
+      ctx.fillStyle='#fcc419'; ctx.fillText('y',qx+10,qy-8);
+      // status
+      const sep = dist > rU+rV;
+      ctx.font='13px monospace'; ctx.fillStyle= sep?'#68d391':'#fc8181';
+      ctx.fillText(sep?'U ∩ V = ∅  ✓ Hausdorff':'U ∩ V ≠ ∅  — kéo x ra xa',12,22);
+    } else {
+      // Non-Hausdorff
+      ctx.strokeStyle='#555'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(60,H/2-25); ctx.lineTo(W-60,H/2-25); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(60,H/2+25); ctx.lineTo(W-60,H/2+25); ctx.stroke();
+      const r=60;
+      ctx.beginPath(); ctx.arc(W/2,H/2-25,r,0,Math.PI*2);
+      ctx.strokeStyle='#63b3ed'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(W/2,H/2+25,r,0,Math.PI*2);
+      ctx.strokeStyle='#fcc419'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(W/2,H/2-25,7,0,Math.PI*2); ctx.fillStyle='#63b3ed'; ctx.fill();
+      ctx.beginPath(); ctx.arc(W/2,H/2+25,7,0,Math.PI*2); ctx.fillStyle='#fcc419'; ctx.fill();
+      ctx.font='bold 13px serif'; ctx.fillStyle='#63b3ed'; ctx.fillText('0ₐ',W/2+10,H/2-28);
+      ctx.fillStyle='#fcc419'; ctx.fillText('0_b',W/2+10,H/2+38);
+      ctx.font='12px monospace'; ctx.fillStyle='#fc8181';
+      ctx.fillText('Mọi U∋0ₐ và V∋0_b đều giao',W/2-140,H-24);
+      ctx.fillText('→ Không tách được  ✗',W/2-100,H-8);
+    }
+  }
+},
+
+// 3: COMPẮC
+{
+  title: 'Compắc — Compact Space',
+  subtitle: 'Xem phủ mở — compắc rút được về hữu hạn tờ',
+  hint: 'Click "Animate" để thấy phủ mở lần lượt',
+  formula: `
+    <div class="fblock">
+      <div class="flabel">Định nghĩa / Definition</div>
+      <div class="ftext">$$X\\text{ compắc}\\iff \\text{mọi phủ mở có phủ con hữu hạn}$$$$X\\subseteq\\bigcup_\\alpha U_\\alpha \\Rightarrow \\exists\\alpha_1..\\alpha_n:\\ X\\subseteq\\bigcup_{k=1}^n U_{\\alpha_k}$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Heine–Borel (ℝⁿ)</div>
+      <div class="ftext">$$K\\subseteq\\mathbb{R}^n\\text{ compắc}\\iff K\\text{ đóng và bị chặn}$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Tính chất / Properties</div>
+      <div class="fvi">• f liên tục, X compắc → f(X) compắc<br>• f continuous, X compact → f(X) compact<br>• Tychonoff: tích compắc là compắc<br>• Tychonoff: product of compacts is compact</div>
+    </div>`,
+  btns: ['Compắc [0,1]','Không compắc (0,1)','▶ Animate'],
+  init() { state={mode:0,step:0,anim:null}; },
+  draw() {
+    const ax=70,bx=W-70,y=H/2;
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#0f1117'; ctx.fillRect(0,0,W,H);
+    const m=state.mode||0;
+    const colors=['#63b3ed','#fcc419','#68d391','#fc8181','#b794f4','#f6ad55'];
+    let intervals;
+    if(m===0) intervals=[{l:ax-8,r:ax+130},{l:ax+110,r:ax+250},{l:ax+230,r:bx+8}];
+    else intervals=[
+      {l:ax+8,r:bx-8},{l:ax+20,r:bx-20},{l:ax+35,r:bx-35},
+      {l:ax+55,r:bx-55},{l:ax+80,r:bx-80},{l:ax+110,r:bx-110}
+    ];
+    const show = Math.min((state.step||0)+1, intervals.length);
+    // draw tập
+    ctx.lineWidth=3;
+    ctx.strokeStyle= m===0?'#68d391':'#fc8181';
+    ctx.beginPath(); ctx.moveTo(ax,y); ctx.lineTo(bx,y); ctx.stroke();
+    ctx.font='bold 18px serif';
+    ctx.fillStyle= m===0?'#68d391':'#fc8181';
+    ctx.fillText(m===0?'[':' (',ax-16,y+7);
+    ctx.fillText(m===0?']':')',bx+2,y+7);
+    ctx.font='12px sans-serif'; ctx.fillStyle='#718096';
+    ctx.fillText('0',ax-4,y+28); ctx.fillText('1',bx-4,y+28);
+    // intervals
+    for(let i=0;i<show;i++){
+      const iv=intervals[i], c=colors[i%colors.length];
+      ctx.globalAlpha=0.2; ctx.fillStyle=c;
+      ctx.fillRect(iv.l,y-28-i*5,iv.r-iv.l,56+i*10);
+      ctx.globalAlpha=1; ctx.strokeStyle=c; ctx.lineWidth=1.5;
+      ctx.setLineDash([4,3]); ctx.strokeRect(iv.l,y-28-i*5,iv.r-iv.l,56+i*10); ctx.setLineDash([]);
+      ctx.font='bold 11px sans-serif'; ctx.fillStyle=c;
+      ctx.fillText('U'+(i+1),iv.l+3,y-30-i*5);
+    }
+    ctx.font='13px monospace';
+    ctx.fillStyle= m===0?'#68d391':'#fc8181';
+    ctx.fillText(m===0?`✓ Compắc: ${show} tờ đủ phủ`:`✗ Cần thêm tờ... (${show}/${intervals.length})`,12,22);
+  }
+},
+
+// 4: LIÊN THÔNG
+{
+  title: 'Liên Thông — Connected Space',
+  subtitle: 'Xem các dạng liên thông khác nhau',
+  hint: 'Chọn mode để xem',
+  formula: `
+    <div class="fblock">
+      <div class="flabel">Liên Thông / Connected</div>
+      <div class="ftext">$$X\\text{ liên thông}\\iff \\nexists U,V\\in\\mathcal{T}\\text{ rỗng}:\\ U\\cup V=X,\\ U\\cap V=\\emptyset$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Liên Thông Cung / Path-connected</div>
+      <div class="ftext">$$\\forall x,y\\in X,\\ \\exists\\gamma:[0,1]\\to X:\\ \\gamma(0)=x,\\ \\gamma(1)=y$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Quan hệ / Relation</div>
+      <div class="ftext">$$\\text{path-connected}\\Rightarrow\\text{connected}$$$$\\text{ngược lại SAI! (Comb Space)}$$</div>
+    </div>`,
+  btns: ['Liên thông ✓','Không liên thông ✗','Path-connected','Comb Space ⚠'],
+  init() { state={mode:0}; },
+  draw(mx,my) {
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#0f1117'; ctx.fillRect(0,0,W,H);
+    const m=state.mode||0;
+    if(m===0){
+      ctx.beginPath(); ctx.arc(W/2,H/2,100,0,Math.PI*2);
+      ctx.fillStyle='rgba(99,179,237,0.15)'; ctx.fill();
+      ctx.strokeStyle='#63b3ed'; ctx.lineWidth=2.5; ctx.stroke();
+      ctx.font='15px serif'; ctx.fillStyle='#63b3ed'; ctx.fillText('X liên thông',W/2-50,H/2+5);
+      ctx.font='13px monospace'; ctx.fillStyle='#68d391'; ctx.fillText('✓ Không thể cắt thành U⊔V',W/2-120,26);
+    } else if(m===1){
+      ctx.beginPath(); ctx.arc(150,H/2,75,0,Math.PI*2);
+      ctx.fillStyle='rgba(99,179,237,0.15)'; ctx.fill();
+      ctx.strokeStyle='#63b3ed'; ctx.lineWidth=2; ctx.stroke();
+      ctx.font='bold 15px serif'; ctx.fillStyle='#63b3ed'; ctx.fillText('U',140,H/2+5);
+      ctx.beginPath(); ctx.arc(330,H/2,75,0,Math.PI*2);
+      ctx.fillStyle='rgba(252,196,25,0.15)'; ctx.fill();
+      ctx.strokeStyle='#fcc419'; ctx.lineWidth=2; ctx.stroke();
+      ctx.fillStyle='#fcc419'; ctx.fillText('V',320,H/2+5);
+      ctx.font='12px monospace'; ctx.fillStyle='#fc8181';
+      ctx.fillText('U∩V=∅, U∪V=X',W/2-70,22); ctx.fillText('✗ Không liên thông',W/2-60,38);
+    } else if(m===2){
+      const pts=[{x:80,y:160},{x:160,y:70},{x:260,y:140},{x:360,y:60},{x:430,y:160}];
+      ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+      for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+      ctx.strokeStyle='#b794f4'; ctx.lineWidth=3; ctx.stroke();
+      pts.forEach((p,i)=>{
+        ctx.beginPath(); ctx.arc(p.x,p.y,6,0,Math.PI*2);
+        ctx.fillStyle=i===0?'#63b3ed':i===4?'#fcc419':'#b794f4'; ctx.fill();
+      });
+      ctx.font='bold 13px serif';
+      ctx.fillStyle='#63b3ed'; ctx.fillText('x',pts[0].x-18,pts[0].y);
+      ctx.fillStyle='#fcc419'; ctx.fillText('y',pts[4].x+10,pts[4].y);
+      ctx.fillStyle='#b794f4'; ctx.font='12px serif'; ctx.fillText('γ:[0,1]→X',W/2-40,H-12);
+      ctx.fillStyle='#68d391'; ctx.font='13px monospace'; ctx.fillText('✓ Path-connected',16,22);
+    } else {
+      // comb space
+      ctx.strokeStyle='#f6ad55'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(70,H-44); ctx.lineTo(W-70,H-44); ctx.stroke();
+      for(let i=0;i<=10;i++){
+        const x=70+i*34;
+        ctx.beginPath(); ctx.moveTo(x,H-44); ctx.lineTo(x,50); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.arc(70,H-44,7,0,Math.PI*2); ctx.fillStyle='#fc8181'; ctx.fill();
+      ctx.font='bold 12px sans-serif'; ctx.fillStyle='#fc8181'; ctx.fillText('p',54,H-54);
+      ctx.font='12px monospace'; ctx.fillStyle='#fcc419'; ctx.fillText('liên thông ✓',12,22);
+      ctx.fillStyle='#fc8181'; ctx.fillText('path-connected ✗',12,38);
+      ctx.fillStyle='#718096'; ctx.font='11px sans-serif';
+      ctx.fillText('Không có γ liên tục đến p từ răng lược',60,H-10);
+    }
+  }
+},
+
+// 5: TRÙ MẬT
+{
+  title: 'Trù Mật — Dense Subset',
+  subtitle: 'Hover để đặt khoảng mở U — xem U có chạm A không',
+  hint: 'Di chuột trên trục số',
+  formula: `
+    <div class="fblock">
+      <div class="flabel">Định nghĩa / Definition</div>
+      <div class="ftext">$$A\\text{ trù mật trong }X\\iff\\overline{A}=X$$$$\\iff\\forall U\\in\\mathcal{T}\\setminus\\{\\emptyset\\}:\\ U\\cap A\\neq\\emptyset$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Ví dụ / Example</div>
+      <div class="ftext">$$\\mathbb{Q}\\text{ trù mật trong }\\mathbb{R}$$$$\\mathbb{R}\\setminus\\mathbb{Q}\\text{ cũng trù mật trong }\\mathbb{R}$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Separable</div>
+      <div class="ftext">$$X\\text{ separable}\\iff\\exists A\\text{ đếm được, trù mật}$$</div>
+      <div class="fvi">ℝⁿ separable vì ℚⁿ đếm được và trù mật<br>ℝⁿ is separable since ℚⁿ is countable dense</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Baire Category</div>
+      <div class="ftext">$$\\bigcap_{n=1}^\\infty U_n\\text{ trù mật nếu mỗi }U_n\\text{ mở trù mật}$$</div>
+    </div>`,
+  btns: ['ℚ trù mật','Tập thưa (không trù mật)'],
+  init() { state={mode:0}; },
+  draw(mx) {
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#0f1117'; ctx.fillRect(0,0,W,H);
+    const ax=60,bx=W-60,y=H/2;
+    ctx.strokeStyle='#4a5568'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(ax-10,y); ctx.lineTo(bx+10,y); ctx.stroke();
+    ctx.font='13px serif'; ctx.fillStyle='#555'; ctx.fillText('ℝ',bx+14,y+5);
+    const dense=!(state.mode||0);
+    const pts=dense?Array.from({length:72},(_,i)=>ax+i*((bx-ax)/71)):[120,190,270,340,410];
+    const r=30;
+    if(mx && mx>ax && mx<bx){
+      const hit=pts.some(p=>Math.abs(p-mx)<r);
+      ctx.fillStyle=hit?'rgba(104,211,145,0.12)':'rgba(252,129,129,0.12)';
+      ctx.fillRect(mx-r,y-32,r*2,64);
+      ctx.strokeStyle=hit?'#68d391':'#fc8181'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+      ctx.strokeRect(mx-r,y-32,r*2,64); ctx.setLineDash([]);
+      ctx.font='12px monospace'; ctx.fillStyle=hit?'#68d391':'#fc8181';
+      ctx.fillText(hit?'U∩A≠∅  ✓':'U∩A=∅  ✗',mx-r,y-36);
+    }
+    pts.forEach(p=>{
+      ctx.beginPath(); ctx.arc(p,y,dense?3:6,0,Math.PI*2);
+      ctx.fillStyle=dense?'#63b3ed':'#f6ad55'; ctx.fill();
+    });
+    ctx.font='12px sans-serif'; ctx.fillStyle=dense?'#63b3ed':'#f6ad55';
+    ctx.fillText(dense?'A = ℚ (mẫu hóa)':'A = tập thưa',ax,H-16);
+    ctx.fillStyle=dense?'#68d391':'#fc8181'; ctx.font='13px monospace';
+    ctx.fillText(dense?'✓ Trù mật: Ā = ℝ':'✗ Không trù mật: Ā ≠ ℝ',ax,22);
+  }
+},
+
+// 6: KHÔNG GIAN THƯƠNG
+{
+  title: 'Không Gian Thương — Quotient Space',
+  subtitle: 'Xem cách dán cạnh tạo ra không gian mới',
+  hint: 'Chọn ví dụ dán',
+  formula: `
+    <div class="fblock">
+      <div class="flabel">Định nghĩa / Definition</div>
+      <div class="ftext">$$X/{{\\sim}} = \\{[x]\\mid x\\in X\\}$$$$\\mathcal{T}_{X/\\sim}=\\{V\\mid\\pi^{-1}(V)\\in\\mathcal{T}_X\\}$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Ánh xạ chiếu / Projection</div>
+      <div class="ftext">$$\\pi: X\\to X/{\\sim},\\quad \\pi(x)=[x]$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Ví dụ / Examples</div>
+      <div class="ftext">$$[0,1]/\\{0{\\sim}1\\}\\cong S^1$$$$[0,1]^2/{\\sim}\\cong\\mathbb{T}^2$$$$[0,1]^2/{\\sim'}\\cong\\mathbb{R}P^2$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Nhóm cơ bản / π₁</div>
+      <div class="ftext">$$\\pi_1(S^1)=\\mathbb{Z}$$$$\\pi_1(\\mathbb{T}^2)=\\mathbb{Z}^2$$$$\\pi_1(\\mathbb{R}P^2)=\\mathbb{Z}/2$$</div>
+    </div>`,
+  btns:['[0,1]→S¹','□→𝕋²','□→ℝP²'],
+  init(){state={mode:0};},
+  draw(){
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#0f1117'; ctx.fillRect(0,0,W,H);
+    const m=state.mode||0;
+    function arr(x1,y1,x2,y2,col,lbl,rev){
+      ctx.strokeStyle=col; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      const a=Math.atan2(y2-y1,x2-x1), tip=rev?{x:x1,y:y1}:{x:x2,y:y2}, aa=rev?a+Math.PI:a;
+      ctx.beginPath(); ctx.moveTo(tip.x,tip.y);
+      ctx.lineTo(tip.x-10*Math.cos(aa-0.4),tip.y-10*Math.sin(aa-0.4));
+      ctx.lineTo(tip.x-10*Math.cos(aa+0.4),tip.y-10*Math.sin(aa+0.4));
+      ctx.closePath(); ctx.fillStyle=col; ctx.fill();
+      if(lbl){ctx.fillStyle=col;ctx.font='bold 13px serif';ctx.fillText(lbl,(x1+x2)/2+4,(y1+y2)/2-6);}
+    }
+    if(m===0){
+      const lx=60,ly=H/2,lw=150;
+      ctx.strokeStyle='#b794f4'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(lx+lw,ly); ctx.stroke();
+      ctx.beginPath(); ctx.arc(lx,ly,8,0,Math.PI*2); ctx.fillStyle='#fc8181'; ctx.fill();
+      ctx.beginPath(); ctx.arc(lx+lw,ly,8,0,Math.PI*2); ctx.fillStyle='#fc8181'; ctx.fill();
+      ctx.font='bold 13px serif'; ctx.fillStyle='#fc8181';
+      ctx.fillText('0',lx-6,ly+26); ctx.fillText('1',lx+lw-4,ly+26);
+      ctx.fillStyle='#fcc419'; ctx.font='12px sans-serif'; ctx.fillText('0 ~ 1',lx+lw/2-20,ly-16);
+      ctx.fillStyle='#aaa'; ctx.font='22px serif'; ctx.fillText('→',lx+lw+18,ly+8);
+      const cx=lx+lw+105,cy=ly;
+      ctx.beginPath(); ctx.arc(cx,cy,52,0,Math.PI*2);
+      ctx.fillStyle='rgba(183,148,244,0.12)'; ctx.fill();
+      ctx.strokeStyle='#b794f4'; ctx.lineWidth=2.5; ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx+52,cy,8,0,Math.PI*2); ctx.fillStyle='#fc8181'; ctx.fill();
+      ctx.fillStyle='#fc8181'; ctx.font='12px serif'; ctx.fillText('0=1',cx+54,cy-12);
+      ctx.fillStyle='#68d391'; ctx.font='bold 15px serif'; ctx.fillText('S¹',cx-10,cy+6);
+      ctx.fillStyle='#aaa'; ctx.font='12px sans-serif'; ctx.fillText('[0,1]/{0~1} ≅ S¹',lx,H-12);
+    } else if(m===1){
+      const ox=70,oy=35,s=140;
+      ctx.fillStyle='rgba(99,179,237,0.08)'; ctx.fillRect(ox,oy,s,s);
+      arr(ox,oy+s,ox,oy,'#63b3ed','a'); arr(ox+s,oy+s,ox+s,oy,'#63b3ed','a');
+      arr(ox,oy,ox+s,oy,'#68d391','b'); arr(ox,oy+s,ox+s,oy+s,'#68d391','b');
+      ctx.fillStyle='#718096'; ctx.font='11px sans-serif';
+      ctx.fillText('a-a cùng chiều → trụ',ox,oy+s+20);
+      ctx.fillText('b-b cùng chiều → xuyến',ox,oy+s+36);
+      ctx.fillStyle='#aaa'; ctx.font='22px serif'; ctx.fillText('→',ox+s+16,oy+s/2+8);
+      const tx=ox+s+105,ty=oy+s/2;
+      ctx.beginPath(); ctx.ellipse(tx,ty,62,38,0,0,Math.PI*2);
+      ctx.fillStyle='rgba(99,179,237,0.1)'; ctx.fill();
+      ctx.strokeStyle='#63b3ed'; ctx.lineWidth=2; ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(tx,ty,28,38,0,0,Math.PI*2);
+      ctx.strokeStyle='#68d391'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle='#fcc419'; ctx.font='bold 16px serif'; ctx.fillText('𝕋²',tx-12,ty+6);
+      ctx.fillStyle='#aaa'; ctx.font='12px sans-serif'; ctx.fillText('π₁(𝕋²)=ℤ²',ox,H-12);
+    } else {
+      const ox=70,oy=35,s=140;
+      ctx.fillStyle='rgba(252,196,25,0.07)'; ctx.fillRect(ox,oy,s,s);
+      arr(ox,oy,ox,oy+s,'#fcc419','a'); arr(ox+s,oy+s,ox+s,oy,'#fcc419','a');
+      arr(ox,oy,ox+s,oy,'#68d391','b'); arr(ox,oy+s,ox+s,oy+s,'#68d391','b');
+      ctx.fillStyle='#fc8181'; ctx.font='11px sans-serif';
+      ctx.fillText('a-a ngược chiều → ℝP²',ox,oy+s+20);
+      ctx.fillStyle='#aaa'; ctx.font='22px serif'; ctx.fillText('→',ox+s+16,oy+s/2+8);
+      const tx=ox+s+105,ty=oy+s/2;
+      ctx.beginPath(); ctx.arc(tx,ty,55,0,Math.PI*2);
+      ctx.fillStyle='rgba(252,196,25,0.1)'; ctx.fill();
+      ctx.strokeStyle='#fcc419'; ctx.lineWidth=2; ctx.setLineDash([6,4]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle='#fcc419'; ctx.font='bold 14px serif'; ctx.fillText('ℝP²',tx-18,ty+6);
+      ctx.fillStyle='#aaa'; ctx.font='12px sans-serif'; ctx.fillText('π₁(ℝP²)=ℤ/2',ox,H-12);
+    }
+  }
+},
+
+// 7: KHÔNG GIAN PHỦ
+{
+  title: 'Không Gian Phủ — Covering Space',
+  subtitle: 'Click vào S¹ để thấy các tờ preimage trên ℝ',
+  hint: 'Click vào vòng tròn S¹ ở dưới',
+  formula: `
+    <div class="fblock">
+      <div class="flabel">Định nghĩa / Definition</div>
+      <div class="ftext">$$p:\\tilde{X}\\to X\\text{ là phủ}\\iff$$$$\\forall x\\in X,\\ \\exists U\\ni x:\\ p^{-1}(U)=\\bigsqcup_\\alpha V_\\alpha$$$$p|_{V_\\alpha}: V_\\alpha\\xrightarrow{\\sim} U$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Nâng đường / Path Lifting</div>
+      <div class="ftext">$$\\forall\\gamma:[0,1]\\to X,\\ \\exists!\\tilde{\\gamma}:\\ p\\circ\\tilde{\\gamma}=\\gamma$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Liên hệ π₁</div>
+      <div class="ftext">$$p_*:\\pi_1(\\tilde{X})\\hookrightarrow\\pi_1(X)$$$$|\\text{tờ}|=[\\pi_1(X):p_*(\\pi_1(\\tilde{X}))]$$</div>
+    </div>
+    <div class="fblock">
+      <div class="flabel">Ví dụ / Examples</div>
+      <div class="ftext">$$p:\\mathbb{R}\\to S^1,\\ p(t)=e^{2\\pi it}$$$$p:S^n\\to\\mathbb{R}P^n\\text{ (2 tờ)}$$</div>
+    </div>`,
+  btns:['ℝ→S¹ (∞ tờ)','S²→ℝP² (2 tờ)'],
+  init(){state={mode:0,angle:0};},
+  draw(mx,my){
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#0f1117'; ctx.fillRect(0,0,W,H);
+    const m=state.mode||0;
+    if(m===0){
+      const cx=W/2,cy=H-55,R=42;
+      // sheets ℝ
+      const colors2=['#fc8181','#f6ad55','#fcc419','#68d391','#63b3ed','#b794f4','#81e6d9'];
+      const sheetW=340, sx=(W-sheetW)/2;
+      for(let n=-3;n<=3;n++){
+        const sy=48+(n+3)*18;
+        ctx.globalAlpha=n===0?1:0.45;
+        ctx.strokeStyle=colors2[n+3]; ctx.lineWidth=1.8;
+        ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx+sheetW,sy); ctx.stroke();
+        ctx.fillStyle=colors2[n+3]; ctx.font='10px monospace';
+        ctx.fillText('n='+n,sx-32,sy+4);
+      }
+      ctx.globalAlpha=1;
+      ctx.fillStyle='#b794f4'; ctx.font='12px serif'; ctx.fillText('ℝ',sx-4,38);
+      // S¹
+      ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2);
+      ctx.fillStyle='rgba(129,230,217,0.1)'; ctx.fill();
+      ctx.strokeStyle='#81e6d9'; ctx.lineWidth=2.5; ctx.stroke();
+      ctx.fillStyle='#81e6d9'; ctx.font='bold 13px serif'; ctx.fillText('S¹',cx-8,cy+5);
+      // selected angle
+      const ang=state.angle||0;
+      const px2=cx+R*Math.cos(ang), py2=cy+R*Math.sin(ang);
+      ctx.beginPath(); ctx.arc(px2,py2,6,0,Math.PI*2); ctx.fillStyle='#fcc419'; ctx.fill();
+      ctx.fillStyle='#fcc419'; ctx.font='12px serif'; ctx.fillText('x',px2+8,py2-4);
+      // preimages
+      for(let n=-3;n<=3;n++){
+        const t=(ang/(2*Math.PI)+n);
+        const spx=sx+((t+3.5)/7)*sheetW;
+        const spy=48+(n+3)*18;
+        const col=colors2[n+3];
+        ctx.beginPath(); ctx.arc(spx,spy,5,0,Math.PI*2); ctx.fillStyle=col; ctx.fill();
+        ctx.strokeStyle=col; ctx.lineWidth=0.8; ctx.globalAlpha=0.3; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(spx,spy+5); ctx.lineTo(px2,py2-6); ctx.stroke();
+        ctx.setLineDash([]); ctx.globalAlpha=1;
+      }
+      ctx.fillStyle='#68d391'; ctx.font='12px monospace'; ctx.fillText('p⁻¹(x) = ℤ  (vô số tờ)',12,H-8);
+    } else {
+      // S²→ℝP²
+      const cx1=150,cy1=H/2-10,r1=68;
+      const cx2=360,cy2=H/2-10,r2=68;
+      ctx.beginPath(); ctx.arc(cx1,cy1,r1,0,Math.PI*2);
+      ctx.fillStyle='rgba(99,179,237,0.1)'; ctx.fill();
+      ctx.strokeStyle='#63b3ed'; ctx.lineWidth=2; ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(cx1,cy1,r1,r1*0.28,0,0,Math.PI*2);
+      ctx.strokeStyle='rgba(99,179,237,0.3)'; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle='#63b3ed'; ctx.font='bold 14px serif'; ctx.fillText('S²',cx1-8,cy1-r1-10);
+      const ang2=state.angle||-0.8;
+      const ppx=cx1+r1*0.72*Math.cos(ang2), ppy=cy1+r1*0.55*Math.sin(ang2);
+      const qqx=cx1-r1*0.72*Math.cos(ang2), qqy=cy1-r1*0.55*Math.sin(ang2);
+      ctx.beginPath(); ctx.arc(ppx,ppy,6,0,Math.PI*2); ctx.fillStyle='#fcc419'; ctx.fill();
+      ctx.fillStyle='#fcc419'; ctx.font='12px serif'; ctx.fillText('x',ppx+7,ppy-4);
+      ctx.beginPath(); ctx.arc(qqx,qqy,6,0,Math.PI*2); ctx.fillStyle='#fc8181'; ctx.fill();
+      ctx.fillStyle='#fc8181'; ctx.fillText('-x',qqx+7,qqy-4);
+      ctx.fillStyle='#aaa'; ctx.font='20px serif'; ctx.fillText('→',cx1+r1+10,cy1+6);
+      ctx.beginPath(); ctx.arc(cx2,cy2,r2,0,Math.PI*2);
+      ctx.fillStyle='rgba(252,196,25,0.1)'; ctx.fill();
+      ctx.strokeStyle='#fcc419'; ctx.lineWidth=2; ctx.setLineDash([6,4]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle='#fcc419'; ctx.font='bold 14px serif'; ctx.fillText('ℝP²',cx2-14,cy2-r2-10);
+      ctx.beginPath(); ctx.arc(cx2,cy2,6,0,Math.PI*2); ctx.fillStyle='#68d391'; ctx.fill();
+      ctx.fillStyle='#68d391'; ctx.font='12px serif'; ctx.fillText('[x]',cx2+8,cy2+4);
+      ctx.strokeStyle='#fcc419'; ctx.lineWidth=0.8; ctx.globalAlpha=0.3; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(ppx,ppy); ctx.lineTo(cx2,cy2); ctx.stroke();
+      ctx.strokeStyle='#fc8181';
+      ctx.beginPath(); ctx.moveTo(qqx,qqy); ctx.lineTo(cx2,cy2); ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha=1;
+      ctx.fillStyle='#68d391'; ctx.font='12px monospace'; ctx.fillText('|p⁻¹(y)| = 2  (2 tờ)',12,H-8);
+    }
+  }
+}
+
+];
+
+// ── RENDER ───────────────────────────────────────────────
+function show(i) {
+  // clear anim
+  if(state.anim) { clearInterval(state.anim); state.anim=null; }
+
+  current = i;
+  document.querySelectorAll('.nav-item').forEach((el,j)=>el.classList.toggle('active',j===i));
+  const p = panels[i];
+  document.getElementById('title').textContent = p.title;
+  document.getElementById('subtitle').textContent = p.subtitle;
+  document.getElementById('hint').textContent = p.hint;
+  document.getElementById('fml').innerHTML = p.formula;
+
+  // buttons
+  const cr = document.getElementById('ctrl-row');
+  cr.innerHTML = '';
+  (p.btns||[]).forEach((lbl,bi)=>{
+    const b = document.createElement('button');
+    b.className = 'btn' + (bi===0?' active':'');
+    b.textContent = lbl;
+    b.onclick = () => {
+      if(lbl==='▶ Animate') {
+        runAnim(i); return;
+      }
+      cr.querySelectorAll('.btn').forEach((bb,bj)=>bb.classList.toggle('active',bj===bi));
+      state.mode = bi;
+      p.draw();
+    };
+    cr.appendChild(b);
+  });
+
+  p.init();
+  p.draw();
+
+  // MathJax re-render
+  if(window.MathJax) MathJax.typesetPromise([document.getElementById('fml')]);
+}
+
+function runAnim(i) {
+  if(state.anim) { clearInterval(state.anim); state.anim=null; }
+  state.step = 0;
+  panels[i].draw();
+  state.anim = setInterval(()=>{
+    state.step = (state.step||0)+1;
+    panels[i].draw();
+    const max = (state.mode||0)===0 ? 3 : 6;
+    if(state.step >= max-1) { clearInterval(state.anim); state.anim=null; }
+  }, 600);
+}
+
+// mouse events
+cv.addEventListener('mousemove', e=>{
+  const r=cv.getBoundingClientRect();
+  panels[current].draw(e.clientX-r.left, e.clientY-r.top);
+});
+cv.addEventListener('mouseleave', ()=> panels[current].draw());
+cv.addEventListener('click', e=>{
+  const r=cv.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+  const p=panels[current];
+  if(current===7){
+    if((state.mode||0)===0){
+      const cx=W/2,cy=H-55;
+      state.angle=Math.atan2(my-cy,mx-cx);
+    } else {
+      const cx1=150,cy1=H/2-10;
+      state.angle=Math.atan2(my-cy1,mx-cx1);
+    }
+    p.draw();
+  }
+});
+
+show(0);
+</script>
+</body>
+</html>
