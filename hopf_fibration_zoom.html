@@ -1,0 +1,131 @@
+
+<div style="width:100%;height:500px;position:relative;background:#0a0a14;border-radius:var(--border-radius-lg);overflow:hidden">
+<canvas id="hc" style="width:100%;height:100%"></canvas>
+<div style="position:absolute;top:12px;left:16px;color:#aaa;font-size:11px;font-family:var(--font-mono)">φ: S³ → S²  |  Kéo xoay · Scroll zoom</div>
+<div style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:14px;align-items:center;background:rgba(255,255,255,0.07);border-radius:20px;padding:8px 18px">
+<label style="font-size:11px;color:#aaa">Sợi</label>
+<input type="range" id="nf" min="6" max="48" value="24" step="2" style="width:76px">
+<label style="font-size:11px;color:#aaa">θ₀</label>
+<input type="range" id="th" min="10" max="170" value="90" step="5" style="width:76px">
+<button id="btn" style="font-size:11px;background:rgba(255,255,255,0.1);color:#ddd;border:none;border-radius:12px;padding:4px 10px;cursor:pointer">⏸</button>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const canvas = document.getElementById('hc');
+const container = canvas.parentElement;
+
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(container.clientWidth, container.clientHeight);
+renderer.setClearColor(0x0a0a14, 1);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, container.clientWidth/container.clientHeight, 0.1, 200);
+camera.position.set(0, 0, 6);
+
+const group = new THREE.Group();
+scene.add(group);
+
+// --- Drag to rotate ---
+let isDrag=false, prevX=0, prevY=0;
+canvas.addEventListener('mousedown', e=>{isDrag=true;prevX=e.clientX;prevY=e.clientY;});
+canvas.addEventListener('touchstart', e=>{isDrag=true;prevX=e.touches[0].clientX;prevY=e.touches[0].clientY;},{passive:true});
+window.addEventListener('mouseup',()=>isDrag=false);
+window.addEventListener('touchend',()=>isDrag=false);
+canvas.addEventListener('mousemove', e=>{
+  if(!isDrag)return;
+  group.rotation.y+=(e.clientX-prevX)*0.01;
+  group.rotation.x+=(e.clientY-prevY)*0.01;
+  prevX=e.clientX;prevY=e.clientY;
+});
+canvas.addEventListener('touchmove', e=>{
+  if(!isDrag)return;
+  group.rotation.y+=(e.touches[0].clientX-prevX)*0.01;
+  group.rotation.x+=(e.touches[0].clientY-prevY)*0.01;
+  prevX=e.touches[0].clientX;prevY=e.touches[0].clientY;
+},{passive:true});
+
+// --- Scroll / pinch zoom ---
+let camZ = 6;
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  camZ += e.deltaY * 0.01;
+  camZ = Math.max(1.5, Math.min(20, camZ));
+  camera.position.z = camZ;
+}, {passive:false});
+
+// Pinch zoom
+let pinchDist0 = null;
+canvas.addEventListener('touchstart', e=>{
+  if(e.touches.length===2){
+    const dx=e.touches[0].clientX-e.touches[1].clientX;
+    const dy=e.touches[0].clientY-e.touches[1].clientY;
+    pinchDist0=Math.sqrt(dx*dx+dy*dy);
+  }
+},{passive:true});
+canvas.addEventListener('touchmove', e=>{
+  if(e.touches.length===2 && pinchDist0){
+    const dx=e.touches[0].clientX-e.touches[1].clientX;
+    const dy=e.touches[0].clientY-e.touches[1].clientY;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    camZ *= pinchDist0/dist;
+    camZ=Math.max(1.5,Math.min(20,camZ));
+    camera.position.z=camZ;
+    pinchDist0=dist;
+  }
+},{passive:true});
+canvas.addEventListener('touchend',()=>{pinchDist0=null;},{passive:true});
+
+// --- Auto spin ---
+let autoSpin=true;
+document.getElementById('btn').addEventListener('click',function(){
+  autoSpin=!autoSpin;
+  this.textContent=autoSpin?'⏸':'▶';
+});
+
+// --- Hopf fiber math ---
+function hopfFiber(theta, phi, nPts){
+  const pts=[];
+  const ct=Math.cos(theta/2), st=Math.sin(theta/2);
+  for(let i=0;i<=nPts;i++){
+    const psi=(i/nPts)*Math.PI*2;
+    const x1=ct*Math.cos(psi), x2=ct*Math.sin(psi);
+    const x3=st*Math.cos(phi+psi), x4=st*Math.sin(phi+psi);
+    const d=1-x4;
+    if(Math.abs(d)<0.001)continue;
+    pts.push(new THREE.Vector3(x1/d, x2/d, x3/d));
+  }
+  return pts;
+}
+
+function buildFibers(nFibers, thetaDeg){
+  while(group.children.length)group.remove(group.children[0]);
+  const theta=thetaDeg*Math.PI/180;
+  for(let i=0;i<nFibers;i++){
+    const phi=(i/nFibers)*Math.PI*2;
+    const pts=hopfFiber(theta,phi,80);
+    if(pts.length<2)continue;
+    const curve=new THREE.CatmullRomCurve3(pts,true);
+    const geo=new THREE.BufferGeometry().setFromPoints(curve.getPoints(120));
+    const color=new THREE.Color().setHSL(i/nFibers,0.8,0.6);
+    group.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color,transparent:true,opacity:0.85})));
+  }
+}
+
+buildFibers(24,90);
+document.getElementById('nf').addEventListener('input',function(){buildFibers(+this.value,+document.getElementById('th').value);});
+document.getElementById('th').addEventListener('input',function(){buildFibers(+document.getElementById('nf').value,+this.value);});
+
+window.addEventListener('resize',()=>{
+  renderer.setSize(container.clientWidth,container.clientHeight);
+  camera.aspect=container.clientWidth/container.clientHeight;
+  camera.updateProjectionMatrix();
+});
+
+(function animate(){
+  requestAnimationFrame(animate);
+  if(autoSpin&&!isDrag) group.rotation.y+=0.005;
+  renderer.render(scene,camera);
+})();
+</script>
