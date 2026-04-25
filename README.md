@@ -5,7 +5,7 @@
 
 [topo](./a.html)
 
-[Toàn thể](./Toan%20the%20scene-export.html)
+[Toàn thể](./1%20Toan%20The-export.html)
 
 [Ln ](./2%20Xem%20Lnn-export.html)
 
