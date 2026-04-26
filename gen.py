@@ -92,8 +92,6 @@ def generate_index():
     # --- 1. Generate pub/index.html ---
     pub_files = sorted([f for f in os.listdir(pub_dir) if f.endswith('.html') and f != 'index.html'])
     pub_cards = "".join([create_card(f) for f in pub_files])
-    if os.path.isdir(math_dir):
-        pub_cards += create_card('math', is_dir=True)
     
     header_pub = """
         <header>
