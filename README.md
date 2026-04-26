@@ -2,10 +2,8 @@
 
 [math`](./math)
 
-[topo](./a.html)
+[1 cau truc](./1%20Cau%20truc-export.html)
 
-[Toàn thể](./1%20Toan%20The-export.html)
+[2 bien doi](./2%20Bien%20doi-export.html)
 
-[Ln ](./2%20Xem%20Lnn-export.html)
-
-[chieu lap the](./3%20Chieu%20lap%20the-export.html)
+[3 phep chieu](./3%20Phep%20chieu-export.html)
